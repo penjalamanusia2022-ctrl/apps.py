@@ -37,7 +37,13 @@ if 'user_email' not in st.session_state:
 
 current_user = st.session_state.user_email
 
-# --- 4. TAMPILAN UTAMA ---
+# --- 4. INISIALISASI STATE (PENTING AGAR TIDAK ERROR) ---
+if "in_at" not in st.session_state:
+    st.session_state["in_at"] = ""
+if "in_nt" not in st.session_state:
+    st.session_state["in_nt"] = ""
+
+# --- 5. TAMPILAN UTAMA ---
 st.sidebar.write(f"Logged in: **{current_user}**")
 if st.sidebar.button("Logout"):
     del st.session_state.user_email
@@ -46,42 +52,49 @@ if st.sidebar.button("Logout"):
 st.title("🙏 Diary Renungan Digital")
 tab1, tab2, tab3 = st.tabs(["✨ Acak Ayat", "📝 Tulis Log", "📜 Riwayat Saya"])
 
-# --- TAB 1: ACAK AYAT (FIXED) ---
+# --- TAB 1: ACAK AYAT ---
 with tab1:
     st.subheader("Inspirasi Hari Ini")
     if st.button("🔄 Dapatkan Ayat Baru"):
-        # Pilih ayat acak dan simpan ke session state
-        st.session_state.current_quote = random.choice(quotes_list)
-        # Paksa update ke input box di Tab 2
-        st.session_state["in_at"] = st.session_state.current_quote
+        # Kita ubah State-nya di sini, lalu rerun agar Tab 2 ikut berubah
+        st.session_state["in_at"] = random.choice(quotes_list)
+        safe_rerun()
     
-    q_display = st.session_state.get('current_quote', "Klik tombol di atas.")
-    st.info(f"### {q_display}")
+    # Menampilkan apa yang sedang ada di state
+    q_now = st.session_state["in_at"] if st.session_state["in_at"] else "Klik tombol di atas."
+    st.info(f"### {q_now}")
 
 # --- TAB 2: TULIS ---
 with tab2:
-    # Widget input dengan key yang terhubung ke session state
-    at = st.text_area("Ayat:", key="in_at", height=100)
-    nt = st.text_area("Catatan:", key="in_nt", height=200)
+    # Perhatikan: Kita tidak pakai parameter 'value', tapi langsung 'key'
+    # Streamlit akan otomatis sinkron dengan st.session_state["in_at"]
+    st.text_area("Ayat:", key="in_at", height=100)
+    st.text_area("Catatan:", key="in_nt", height=200)
     
     if st.button("💾 Simpan Permanen"):
-        if at and nt:
+        # Ambil nilai langsung dari state
+        val_at = st.session_state["in_at"]
+        val_nt = st.session_state["in_nt"]
+        
+        if val_at and val_nt:
             try:
                 supabase.table("database_renungan").insert({
-                    "ayat": at, 
-                    "notes": nt,
+                    "ayat": val_at, 
+                    "notes": val_nt,
                     "author": current_user 
                 }).execute()
                 
-                # Reset Form setelah simpan
+                # Reset State secara bersih
                 st.session_state["in_at"] = ""
                 st.session_state["in_nt"] = ""
-                st.session_state.current_quote = ""
                 
                 st.success("✅ Tersimpan di database pribadi Anda!")
-                safe_rerun()
+                # Beri sedikit jeda agar user lihat pesan sukses, lalu rerun
+                st.rerun()
             except Exception as e:
                 st.error(f"Gagal Simpan: {e}")
+        else:
+            st.warning("Isi dulu ayat dan catatannya.")
 
 # --- TAB 3: RIWAYAT ---
 with tab3:
@@ -96,6 +109,7 @@ with tab3:
                 with st.expander(f"📅 {item['created_at'][:10]} | {item['ayat'][:20]}..."):
                     st.write(f"**Ayat:** {item['ayat']}")
                     st.write(f"**Notes:** {item['notes']}")
+                    # Gunakan ID unik untuk tombol hapus
                     if st.button("🗑️ Hapus", key=f"del_{item['id']}"):
                         supabase.table("database_renungan").delete().eq("id", item['id']).execute()
                         safe_rerun()
