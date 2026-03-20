@@ -8,9 +8,31 @@ st.set_page_config(page_title="Renungan Digital", page_icon="🙏")
 
 # --- 2. KONEKSI SUPABASE ---
 # Mengambil URL dan KEY dari Streamlit Secrets
-url = st.secrets["SUPABASE_URL"]
-key = st.secrets["SUPABASE_KEY"]
+url = st.secrets.get("SUPABASE_URL")
+key = st.secrets.get("SUPABASE_KEY")
+if not url or not key:
+    st.error("Supabase credentials not found in st.secrets. Please set SUPABASE_URL and SUPABASE_KEY.")
+    st.stop()
+
 supabase: Client = create_client(url, key)
+
+# --- helper rerun function for compatibility ---
+def safe_rerun():
+    # Prefer st.rerun(), fallback to st.experimental_rerun if needed
+    if hasattr(st, "rerun"):
+        try:
+            st.rerun()
+            return
+        except Exception:
+            pass
+    if hasattr(st, "experimental_rerun"):
+        try:
+            st.experimental_rerun()
+            return
+        except Exception:
+            pass
+    # If neither works, do nothing (best-effort)
+    st.warning("Unable to programmatically rerun the app on this Streamlit version. Please refresh the page manually.")
 
 # --- 3. LOAD DAFTAR AYAT ---
 @st.cache_data
@@ -42,7 +64,7 @@ with tab1:
         # Perbarui default input_ayat_box agar Tab 2 menunjukkan quote baru saat dibuka
         st.session_state.input_ayat_box = st.session_state.current_quote
         # rerun agar perubahan terlihat segera
-        st.experimental_rerun()
+        safe_rerun()
 
     display_quote = st.session_state.current_quote if st.session_state.current_quote else "Klik tombol di atas."
     st.info(f"### {display_quote}")
@@ -69,8 +91,7 @@ with tab2:
                 "notes": val_notes
             }).execute()
 
-            # Periksa response error dari supabase client (library bisa mengembalikan error di .error atau status_code)
-            # Penanganan sederhana: jika ada error atribut, tampilkan
+            # Periksa response error dari supabase client
             if hasattr(res, "error") and res.error:
                 st.error(f"Gagal simpan! Pastikan RLS di Supabase sudah 'Disable' atau 'Allow Insert'. Error: {res.error}")
                 return
@@ -85,7 +106,7 @@ with tab2:
         st.session_state["input_notes_box"] = ""
         st.success("✅ Berhasil disimpan di Supabase!")
         # Segarkan UI untuk menampilkan perubahan (opsional)
-        st.experimental_rerun()
+        safe_rerun()
 
     st.button("💾 Simpan ke Cloud", on_click=on_submit)
 
@@ -103,14 +124,12 @@ with tab3:
         elif isinstance(response, dict) and "data" in response:
             data = response["data"]
         else:
-            # fallback: coba response itself
             data = response
 
         if not data:
             st.write("Belum ada data.")
         else:
             for item in data:
-                # Format tanggal sederhana
                 tgl = item.get('created_at', '')[:10] if isinstance(item, dict) else "N/A"
                 ayat_preview = item.get('ayat', '')[:30] if isinstance(item, dict) else ""
                 notes = item.get('notes', '') if isinstance(item, dict) else ""
