@@ -44,13 +44,18 @@ with tab1:
         st.session_state.current_quote = random.choice(quotes_list)
         st.rerun()
 
-# --- TAB 2: INPUT & SIMPAN ---
+# --- TAB 2: INPUT & SIMPAN (VERSI PERBAIKAN) ---
 with tab2:
     st.subheader("Tulis Perenungan")
     
-    # Input field dengan key agar bisa direset
+    # PERBAIKAN: Gunakan fungsi callback atau logika session_state yang bersih
+    # Kita tidak menggunakan parameter 'value' di sini, tapi langsung lewat session_state
+    
+    # Pastikan key 'area_ayat' terisi jika ada current_quote dari Tab 1
+    if st.session_state.current_quote and not st.session_state.get("area_ayat"):
+        st.session_state["area_ayat"] = st.session_state.current_quote
+
     input_ayat = st.text_area("Ayat terpilih:", 
-                              value=st.session_state.current_quote, 
                               height=100, 
                               key="area_ayat")
     
@@ -61,34 +66,34 @@ with tab2:
     if st.button("💾 Simpan Permanen ke Cloud"):
         if input_ayat.strip() and input_notes.strip():
             try:
-                # Membaca data lama
+                # 1. Membaca data lama
                 existing_data = conn.read()
                 
-                # Membuat baris baru
+                # 2. Membuat baris baru
                 new_row = pd.DataFrame({
                     "ayat": [input_ayat],
                     "notes": [input_notes],
                     "timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
                 })
                 
-                # Menggabungkan data
+                # 3. Gabungkan
                 updated_df = pd.concat([existing_data, new_row], ignore_index=True)
                 
-                # Update ke Google Sheets
+                # 4. Update ke Google Sheets
                 conn.update(data=updated_df)
                 
-                # Reset Form
+                # --- 5. PROSES RESET YANG BENAR ---
                 st.session_state.current_quote = ""
                 st.session_state["area_ayat"] = ""
                 st.session_state["area_notes"] = ""
                 
-                st.success("✅ Catatan berhasil disimpan selamanya!")
-                st.rerun()
+                st.success("✅ Catatan berhasil disimpan!")
+                st.rerun() 
+                
             except Exception as e:
-                st.error(f"Gagal menyimpan. Pastikan Secrets sudah benar. Error: {e}")
+                st.error(f"Gagal simpan. Error: {e}")
         else:
-            st.warning("⚠️ Mohon isi ayat dan catatan terlebih dahulu.")
-
+            st.warning("⚠️ Mohon isi semua kolom.")
 # --- TAB 3: RIWAYAT LOG ---
 with tab3:
     st.subheader("📜 Riwayat Catatan Anda")
