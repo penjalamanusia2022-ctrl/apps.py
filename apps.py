@@ -25,7 +25,7 @@ with tab2:
     if st.button("💾 Simpan"):
         if at and nt:
             # Ganti "renungan_log" dengan nama tabel yang Anda buat tadi
-            supabase.table("renungan_log").insert({"ayat": at, "notes": nt}).execute()
+            supabase.table("database_renungan").insert({"ayat": at, "notes": nt}).execute()
             st.session_state.current_quote = ""
             st.success("Tersimpan!")
             st.rerun()
