@@ -4,79 +4,110 @@ import pandas as pd
 import random
 from datetime import datetime
 
-# --- CONFIG HALAMAN ---
-st.set_page_config(page_title="Renungan Digital", page_icon="🙏")
+# --- 1. KONFIGURASI HALAMAN ---
+st.set_page_config(page_title="Renungan Harian", page_icon="🙏", layout="centered")
 
-# --- KONEKSI KE GOOGLE SHEETS ---
-# Hapus variabel url yang lama, gunakan ini:
+# --- 2. FUNGSI LOAD DATA AYAT ---
+@st.cache_data
+def load_quotes():
+    try:
+        with open("ayat.txt", "r", encoding="utf-8") as f:
+            return [line.strip() for line in f.readlines() if line.strip()]
+    except FileNotFoundError:
+        return ["Akulah jalan dan kebenaran dan hidup."]
+
+quotes_list = load_quotes()
+
+# --- 3. KONEKSI GOOGLE SHEETS ---
+# Mengambil koneksi yang dikonfigurasi di Secrets
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-
-# --- DATA AYAT ---
-# 1. Membaca ayat dari file ayat.txt
-with open("ayat.txt", "r", encoding="utf-8") as f:
-    quotes_list = [line.strip() for line in f.readlines() if line.strip()]
-
-# 2. Sisanya tetap seperti kode sebelumnya
+# --- 4. LOGIKA STATE ---
 if 'current_quote' not in st.session_state:
     st.session_state.current_quote = ""
 
-st.title("🙏 Log Renungan Selamanya")
+# --- 5. UI APLIKASI ---
+st.title("🙏 Aplikasi Renungan Digital")
+st.markdown("---")
 
 tab1, tab2, tab3 = st.tabs(["✨ Acak Ayat", "📝 Catatan Baru", "📜 Riwayat Log"])
 
-# --- TAB 1: RANDOM ---
+# --- TAB 1: ACAK AYAT ---
 with tab1:
-    st.subheader("Inspirasi Hari Ini")
+    st.subheader("Inspirasi Untukmu")
     if st.session_state.current_quote:
         st.info(f"### {st.session_state.current_quote}")
+    else:
+        st.write("Klik tombol di bawah untuk mendapatkan ayat hari ini.")
     
-    if st.button("🔄 Acak Ayat"):
+    if st.button("🔄 Acak Ayat Baru"):
         st.session_state.current_quote = random.choice(quotes_list)
         st.rerun()
 
-# --- TAB 2: SIMPAN KE GOOGLE SHEETS ---
+# --- TAB 2: INPUT & SIMPAN ---
 with tab2:
-    st.subheader("Simpan ke Cloud")
-    ayat_val = st.text_area("Ayat:", value=st.session_state.current_quote)
-    notes_val = st.text_area("Catatan:", placeholder="Tulis di sini...", key="notes")
+    st.subheader("Tulis Perenungan")
+    
+    # Input field dengan key agar bisa direset
+    input_ayat = st.text_area("Ayat terpilih:", 
+                              value=st.session_state.current_quote, 
+                              height=100, 
+                              key="area_ayat")
+    
+    input_notes = st.text_area("Catatan/Notes Pribadi:", 
+                               placeholder="Apa pesan ayat ini bagimu?", 
+                               key="area_notes")
 
-    if st.button("💾 Simpan ke Google Sheets"):
-        if ayat_val and notes_val:
-            # 1. Ambil data yang sudah ada
-            existing_data = conn.read(spreadsheet=url, usecols=[0,1,2])
-            
-            # 2. Buat data baru
-            new_row = pd.DataFrame({
-                "ayat": [ayat_val],
-                "notes": [notes_val],
-                "timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-            })
-            
-            # 3. Gabungkan dan update
-            updated_df = pd.concat([existing_data, new_row], ignore_index=True)
-            conn.update(spreadsheet=url, data=updated_df)
-            
-            st.success("✅ Tersimpan di Google Sheets!")
-            st.session_state.current_quote = ""
-            st.rerun()
+    if st.button("💾 Simpan Permanen ke Cloud"):
+        if input_ayat.strip() and input_notes.strip():
+            try:
+                # Membaca data lama
+                existing_data = conn.read()
+                
+                # Membuat baris baru
+                new_row = pd.DataFrame({
+                    "ayat": [input_ayat],
+                    "notes": [input_notes],
+                    "timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
+                })
+                
+                # Menggabungkan data
+                updated_df = pd.concat([existing_data, new_row], ignore_index=True)
+                
+                # Update ke Google Sheets
+                conn.update(data=updated_df)
+                
+                # Reset Form
+                st.session_state.current_quote = ""
+                st.session_state["area_ayat"] = ""
+                st.session_state["area_notes"] = ""
+                
+                st.success("✅ Catatan berhasil disimpan selamanya!")
+                st.rerun()
+            except Exception as e:
+                st.error(f"Gagal menyimpan. Pastikan Secrets sudah benar. Error: {e}")
         else:
-            st.error("Isi semua data!")
+            st.warning("⚠️ Mohon isi ayat dan catatan terlebih dahulu.")
 
-# --- TAB 3: BACA DARI GOOGLE SHEETS ---
+# --- TAB 3: RIWAYAT LOG ---
 with tab3:
-    st.subheader("Riwayat dari Cloud")
+    st.subheader("📜 Riwayat Catatan Anda")
     try:
-        # Membaca data terbaru dari Google Sheets
-        df = conn.read(spreadsheet=url)
+        # Membaca data dari Google Sheets
+        df = conn.read()
         
-        if df.empty:
-            st.write("Belum ada data.")
+        if df is None or df.empty:
+            st.info("Belum ada catatan yang tersimpan di Cloud.")
         else:
-            # Tampilkan 500 data terakhir (dibalik agar yang terbaru di atas)
-            for index, row in df.iloc[::-1].head(500).iterrows():
+            # Menampilkan dari yang terbaru (reverse)
+            for index, row in df.iloc[::-1].iterrows():
                 with st.expander(f"📅 {row['timestamp']} | {str(row['ayat'])[:30]}..."):
-                    st.write(f"**Ayat:** {row['ayat']}")
-                    st.write(f"**Catatan:** {row['notes']}")
-    except:
-        st.write("Gagal memuat data. Pastikan URL benar dan izin akses Editor aktif.")
+                    st.markdown(f"**Ayat:**\n{row['ayat']}")
+                    st.markdown(f"**Catatan:**\n{row['notes']}")
+                    st.caption(f"ID: {index}")
+    except Exception as e:
+        st.error("Gagal memuat data dari Google Sheets.")
+
+# --- FOOTER ---
+st.markdown("---")
+st.caption("Aplikasi Renungan v2.0 - Tersimpan di Google Sheets")
