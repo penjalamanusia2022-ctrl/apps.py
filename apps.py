@@ -23,9 +23,10 @@ def load_ayat():
 
 quotes_list = load_ayat()
 
-# --- 4. LOGIKA STATE ---
-if 'current_quote' not in st.session_state:
-    st.session_state.current_quote = ""
+# --- 4. LOGIKA STATE (inisialisasi sebelum widget dibuat) ---
+st.session_state.setdefault('current_quote', "")
+st.session_state.setdefault('input_ayat_box', st.session_state.current_quote)
+st.session_state.setdefault('input_notes_box', "")
 
 # --- 5. UI UTAMA ---
 st.title("🙏 Diary Renungan Digital")
@@ -38,38 +39,55 @@ with tab1:
     st.subheader("Inspirasi Hari Ini")
     if st.button("🔄 Dapatkan Ayat Baru"):
         st.session_state.current_quote = random.choice(quotes_list)
-    
+        # Perbarui default input_ayat_box agar Tab 2 menunjukkan quote baru saat dibuka
+        st.session_state.input_ayat_box = st.session_state.current_quote
+        # rerun agar perubahan terlihat segera
+        st.experimental_rerun()
+
     display_quote = st.session_state.current_quote if st.session_state.current_quote else "Klik tombol di atas."
     st.info(f"### {display_quote}")
 
 # --- TAB 2: TULIS & SIMPAN ---
 with tab2:
     st.subheader("Catat Perenunganmu")
-    
-    # Input otomatis jika ada ayat dari Tab 1
-    input_ayat = st.text_area("Ayat:", value=st.session_state.current_quote, key="input_ayat_box")
-    input_notes = st.text_area("Catatan Pribadi:", placeholder="Apa pesan Tuhan hari ini...", key="input_notes_box")
-    
-    if st.button("💾 Simpan ke Cloud"):
-        if input_ayat and input_notes:
-            try:
-                # INSERT ke tabel database_renungan
-                supabase.table("database_renungan").insert({
-                    "ayat": input_ayat,
-                    "notes": input_notes
-                }).execute()
-                
-                # Reset Form
-                st.session_state.current_quote = ""
-                st.session_state["input_ayat_box"] = ""
-                st.session_state["input_notes_box"] = ""
-                
-                st.success("✅ Berhasil disimpan di Supabase!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Gagal simpan! Pastikan RLS di Supabase sudah 'Disable' atau 'Allow Insert'. Error: {e}")
-        else:
+
+    # Buat widget (nilai awal berasal dari session_state yang sudah di-set di atas)
+    input_ayat = st.text_area("Ayat:", value=st.session_state.get('input_ayat_box', ''), key="input_ayat_box", height=150)
+    input_notes = st.text_area("Catatan Pribadi:", placeholder="Apa pesan Tuhan hari ini...", key="input_notes_box", height=200)
+
+    def on_submit():
+        val_ayat = st.session_state.get('input_ayat_box', '').strip()
+        val_notes = st.session_state.get('input_notes_box', '').strip()
+        if not (val_ayat and val_notes):
             st.warning("⚠️ Mohon isi ayat dan catatan.")
+            return
+
+        try:
+            # INSERT ke tabel database_renungan
+            res = supabase.table("database_renungan").insert({
+                "ayat": val_ayat,
+                "notes": val_notes
+            }).execute()
+
+            # Periksa response error dari supabase client (library bisa mengembalikan error di .error atau status_code)
+            # Penanganan sederhana: jika ada error atribut, tampilkan
+            if hasattr(res, "error") and res.error:
+                st.error(f"Gagal simpan! Pastikan RLS di Supabase sudah 'Disable' atau 'Allow Insert'. Error: {res.error}")
+                return
+
+        except Exception as e:
+            st.error(f"Gagal simpan! Pastikan RLS di Supabase sudah 'Disable' atau 'Allow Insert'. Error: {e}")
+            return
+
+        # Reset form safely inside callback
+        st.session_state.current_quote = ""
+        st.session_state["input_ayat_box"] = ""
+        st.session_state["input_notes_box"] = ""
+        st.success("✅ Berhasil disimpan di Supabase!")
+        # Segarkan UI untuk menampilkan perubahan (opsional)
+        st.experimental_rerun()
+
+    st.button("💾 Simpan ke Cloud", on_click=on_submit)
 
 # --- TAB 3: RIWAYAT ---
 with tab3:
@@ -77,15 +95,27 @@ with tab3:
     try:
         # SELECT dari tabel database_renungan
         response = supabase.table("database_renungan").select("*").order("created_at", desc=True).execute()
-        
-        if not response.data:
+
+        # Jika library mengemas hasil di .data atau .json, menyesuaikan sederhana:
+        data = None
+        if hasattr(response, "data"):
+            data = response.data
+        elif isinstance(response, dict) and "data" in response:
+            data = response["data"]
+        else:
+            # fallback: coba response itself
+            data = response
+
+        if not data:
             st.write("Belum ada data.")
         else:
-            for item in response.data:
+            for item in data:
                 # Format tanggal sederhana
-                tgl = item['created_at'][:10] if 'created_at' in item else "N/A"
-                with st.expander(f"📅 {tgl} | {item['ayat'][:30]}..."):
-                    st.write(f"**Ayat:** {item['ayat']}")
-                    st.write(f"**Catatan:** {item['notes']}")
+                tgl = item.get('created_at', '')[:10] if isinstance(item, dict) else "N/A"
+                ayat_preview = item.get('ayat', '')[:30] if isinstance(item, dict) else ""
+                notes = item.get('notes', '') if isinstance(item, dict) else ""
+                with st.expander(f"📅 {tgl} | {ayat_preview}..."):
+                    st.write(f"**Ayat:** {item.get('ayat', '')}")
+                    st.write(f"**Catatan:** {notes}")
     except Exception as e:
         st.error(f"Gagal memuat data. Cek nama tabel di Supabase! Error: {e}")
