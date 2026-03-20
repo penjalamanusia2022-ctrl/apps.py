@@ -11,10 +11,6 @@ st.set_page_config(page_title="Renungan Digital", page_icon="🙏")
 # Hapus variabel url yang lama, gunakan ini:
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# Saat membaca atau update, cukup gunakan:
-existing_data = conn.read(usecols=[0,1,2])
-# ...
-conn.update(data=updated_df)
 
 # --- DATA AYAT ---
 # 1. Membaca ayat dari file ayat.txt
