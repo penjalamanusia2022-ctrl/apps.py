@@ -17,13 +17,13 @@ c.execute('''
 conn.commit()
 
 # --- DATA AYAT ---
-quotes_list = [
-    "Akulah jalan dan kebenaran dan hidup.",
-    "Janganlah gelisah hatimu; percayalah kepada Allah.",
-    "Kasihilah sesamamu manusia seperti dirimu sendiri.",
-    "Damai sejahtera-Ku Kuberikan kepadamu.",
-    "Marilah kepada-Ku, semua yang letih lesu dan berbeban berat.",
-]
+# 1. Membaca ayat dari file ayat.txt
+with open("ayat.txt", "r", encoding="utf-8") as f:
+    quotes_list = [line.strip() for line in f.readlines() if line.strip()]
+
+# 2. Sisanya tetap seperti kode sebelumnya
+if 'current_quote' not in st.session_state:
+    st.session_state.current_quote = ""
 
 # --- LOGIKA STATE ---
 if 'current_quote' not in st.session_state:
