@@ -31,7 +31,7 @@ with tab2:
             st.rerun()
 
 with tab3:
-    res = supabase.table("renungan_log").select("*").order("created_at", desc=True).execute()
+    res = supabase.table("database_renungan").select("*").order("created_at", desc=True).execute()
     for item in res.data:
         with st.expander(f"📅 {item['created_at'][:10]}"):
             st.write(f"**Ayat:** {item['ayat']}")
