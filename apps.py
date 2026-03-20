@@ -111,30 +111,44 @@ with tab2:
     st.button("💾 Simpan ke Cloud", on_click=on_submit)
 
 # --- TAB 3: RIWAYAT ---
+# --- TAB 3: RIWAYAT ---
 with tab3:
-    st.subheader("Daftar Renungan Lampau")
-    try:
-        # SELECT dari tabel database_renungan
-        response = supabase.table("database_renungan").select("*").order("created_at", desc=True).execute()
+    st.subheader("📜 Daftar Renungan Lampau")
+    
+    # Fungsi pembantu untuk menghapus data
+    def delete_entry(entry_id):
+        try:
+            supabase.table("database_renungan").delete().eq("id", entry_id).execute()
+            st.success(f"Catatan berhasil dihapus!")
+            safe_rerun()
+        except Exception as e:
+            st.error(f"Gagal menghapus: {e}")
 
-        # Jika library mengemas hasil di .data atau .json, menyesuaikan sederhana:
-        data = None
-        if hasattr(response, "data"):
-            data = response.data
-        elif isinstance(response, dict) and "data" in response:
-            data = response["data"]
-        else:
-            data = response
+    try:
+        # Ambil data dari Supabase
+        response = supabase.table("database_renungan").select("*").order("created_at", desc=True).execute()
+        
+        data = getattr(response, "data", response)
 
         if not data:
-            st.write("Belum ada data.")
+            st.info("Belum ada catatan tersimpan.")
         else:
             for item in data:
-                tgl = item.get('created_at', '')[:10] if isinstance(item, dict) else "N/A"
-                ayat_preview = item.get('ayat', '')[:30] if isinstance(item, dict) else ""
-                notes = item.get('notes', '') if isinstance(item, dict) else ""
-                with st.expander(f"📅 {tgl} | {ayat_preview}..."):
-                    st.write(f"**Ayat:** {item.get('ayat', '')}")
-                    st.write(f"**Catatan:** {notes}")
+                # Ambil ID dan detail lainnya
+                entry_id = item.get('id')
+                tgl = item.get('created_at', '')[:10]
+                ayat_full = item.get('ayat', '')
+                notes_full = item.get('notes', '')
+                
+                # Baris Expander
+                with st.expander(f"📅 {tgl} | {ayat_full[:30]}..."):
+                    st.write(f"**Ayat:** {ayat_full}")
+                    st.write(f"**Catatan:** {notes_full}")
+                    
+                    # Tambahkan Tombol Hapus di dalam expander
+                    # Gunakan key unik agar tidak bentrok antar baris
+                    if st.button(f"🗑️ Hapus Catatan", key=f"del_{entry_id}"):
+                        delete_entry(entry_id)
+
     except Exception as e:
-        st.error(f"Gagal memuat data. Cek nama tabel di Supabase! Error: {e}")
+        st.error(f"Gagal memuat data. Error: {e}")
