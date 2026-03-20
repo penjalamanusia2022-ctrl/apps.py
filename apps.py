@@ -4,6 +4,7 @@ import random
 import re
 
 # --- 1. KONEKSI SUPABASE ---
+# Pastikan URL dan KEY sudah ada di Streamlit Secrets
 url = st.secrets["SUPABASE_URL"]
 key = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(url, key)
@@ -13,26 +14,31 @@ def safe_rerun():
     if hasattr(st, "rerun"): st.rerun()
     else: st.experimental_rerun()
 
-@st.cache_data
+# Fungsi Load Ayat tanpa @st.cache_data agar sinkron dengan GitHub commit
 def load_ayat():
     try:
         with open("ayat.txt", "r", encoding="utf-8") as f:
-            return [line.strip() for line in f.readlines() if line.strip()]
-    except:
-        return ["Bersyukurlah dalam segala hal.", "Tuhan adalah Gembalaku."]
-
-quotes_list = load_ayat()
+            lines = [line.strip() for line in f.readlines() if line.strip()]
+            return lines if lines else ["Tetaplah berdoa."]
+    except Exception as e:
+        return [f"Gagal memuat ayat.txt: {e}"]
 
 # --- 3. LOGIN SESSION ---
 if 'user_email' not in st.session_state:
     st.title("🔐 Akses Diary Pribadi")
+    st.markdown("Masukkan email Anda untuk memisahkan catatan pribadi dengan pengguna lain.")
+    
     email_input = st.text_input("Masukkan Email Anda:", placeholder="contoh: budi@email.com")
+    
     if st.button("Masuk"):
+        # Validasi format email sederhana
         if email_input and re.match(r"[^@]+@[^@]+\.[^@]+", email_input):
             st.session_state.user_email = email_input.strip().lower()
             st.rerun()
         else:
-            st.error("⚠️ Email tidak valid.")
+            st.error("⚠️ Mohon masukkan format email yang valid.")
+    
+    st.info("💡 Semua catatan Anda akan disimpan berdasarkan email ini.")
     st.stop()
 
 current_user = st.session_state.user_email
@@ -50,64 +56,76 @@ def handle_save():
     
     if val_at and val_nt:
         try:
+            # Pastikan tabel 'database_renungan' punya kolom 'author'
             supabase.table("database_renungan").insert({
                 "ayat": val_at, 
                 "notes": val_nt,
                 "author": current_user 
             }).execute()
-            # Reset state SETELAH berhasil simpan
+            
+            # Reset form secara bersih
             st.session_state["in_at"] = ""
             st.session_state["in_nt"] = ""
-            st.toast("✅ Berhasil disimpan!", icon="🎉")
+            st.toast("✅ Berhasil disimpan ke Cloud!", icon="🎉")
         except Exception as e:
             st.error(f"Gagal Simpan: {e}")
     else:
-        st.warning("Isi dulu ayat dan catatannya.")
+        st.warning("⚠️ Isi ayat dan catatan terlebih dahulu.")
 
 def handle_acak():
+    # Selalu panggil fungsi load_ayat() terbaru agar perubahan file terbaca
+    quotes_list = load_ayat()
     st.session_state["in_at"] = random.choice(quotes_list)
 
 # --- 6. TAMPILAN UTAMA ---
-st.sidebar.write(f"Logged in: **{current_user}**")
-if st.sidebar.button("Logout"):
+st.sidebar.title("👤 Profil User")
+st.sidebar.info(f"Login sebagai:\n**{current_user}**")
+if st.sidebar.button("Keluar (Logout)"):
     del st.session_state.user_email
     st.rerun()
 
 st.title("🙏 Diary Renungan Digital")
+st.markdown("---")
+
 tab1, tab2, tab3 = st.tabs(["✨ Acak Ayat", "📝 Tulis Log", "📜 Riwayat Saya"])
 
 # --- TAB 1: ACAK AYAT ---
 with tab1:
     st.subheader("Inspirasi Hari Ini")
-    # Gunakan on_click agar state berubah sebelum UI render
     st.button("🔄 Dapatkan Ayat Baru", on_click=handle_acak)
     
-    q_now = st.session_state["in_at"] if st.session_state["in_at"] else "Klik tombol di atas."
+    q_now = st.session_state["in_at"] if st.session_state["in_at"] else "Klik tombol di atas untuk memulai."
     st.info(f"### {q_now}")
 
 # --- TAB 2: TULIS ---
 with tab2:
-    st.text_area("Ayat:", key="in_at", height=100)
-    st.text_area("Catatan:", key="in_nt", height=200)
+    st.subheader("Catat Perenunganmu")
+    # Tinggi area teks diperbesar agar nyaman membaca ayat panjang
+    st.text_area("Ayat / Firman:", key="in_at", height=250) 
+    st.text_area("Catatan Pribadi:", key="in_nt", height=350, placeholder="Apa pesan Tuhan untukmu hari ini?")
     
-    # Gunakan on_click untuk menjalankan fungsi simpan
     st.button("💾 Simpan Permanen", on_click=handle_save)
 
 # --- TAB 3: RIWAYAT ---
 with tab3:
-    st.subheader(f"Catatan {current_user}")
+    st.subheader(f"Daftar Riwayat: {current_user}")
     try:
+        # Filter berdasarkan email (author)
         res = supabase.table("database_renungan").select("*").eq("author", current_user).order("created_at", desc=True).execute()
         
         if not res.data:
-            st.write("Belum ada riwayat.")
+            st.write("Belum ada riwayat tersimpan untuk email ini.")
         else:
             for item in res.data:
-                with st.expander(f"📅 {item['created_at'][:10]} | {item['ayat'][:20]}..."):
-                    st.write(f"**Ayat:** {item['ayat']}")
-                    st.write(f"**Catatan:** {item['notes']}")
-                    if st.button("🗑️ Hapus", key=f"del_{item['id']}"):
+                tgl = item['created_at'][:10]
+                ayat_preview = item['ayat'][:40]
+                with st.expander(f"📅 {tgl} | {ayat_preview}..."):
+                    st.write(f"**Ayat:**\n{item['ayat']}")
+                    st.divider()
+                    st.write(f"**Catatan:**\n{item['notes']}")
+                    
+                    if st.button("🗑️ Hapus Catatan", key=f"del_{item['id']}"):
                         supabase.table("database_renungan").delete().eq("id", item['id']).execute()
                         st.rerun()
     except Exception as e:
-        st.error(f"Gagal memuat data: {e}")
+        st.error(f"Gagal memuat data dari database: {e}")
