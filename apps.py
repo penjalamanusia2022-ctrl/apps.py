@@ -101,7 +101,7 @@ with tab1:
 with tab2:
     st.subheader("Catat Perenunganmu")
     # Tinggi area teks diperbesar agar nyaman membaca ayat panjang
-    st.text_area("Ayat / Firman:", key="in_at", height=180) 
+    st.text_area("Ayat / Firman:", key="in_at", height=180, placeholder="silahkan input manual 📝") 
     st.text_area("Catatan Pribadi:", key="in_nt", height=200, placeholder="Apa pesan Tuhan untukmu hari ini?")
     
     st.button("💾 Simpan Permanen", on_click=handle_save)
