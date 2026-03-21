@@ -83,7 +83,7 @@ st.sidebar.info(f"Login sebagai:\n**{current_user}**")
 if st.sidebar.button("Keluar (Logout)"):
     del st.session_state.user_email
     st.rerun()
-st.text_area("KAMU menerima dengan cuma-cuma, berikan dengan cuma-cuma.(Matius 10:8) "
+st.text_area("KAMU menerima dengan cuma-cuma, berikan dengan cuma-cuma.)
 
 st.title("🙏 Diary Renungan Digital")
 st.markdown("---")
