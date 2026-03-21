@@ -79,11 +79,11 @@ def handle_acak():
 
 # --- 6. TAMPILAN UTAMA ---
 st.sidebar.title("👤 Profil User")
+st.text_area("KAMU menerima dengan cuma-cuma, berikan dengan cuma-cuma.")
 st.sidebar.info(f"Login sebagai:\n**{current_user}**")
 if st.sidebar.button("Keluar (Logout)"):
     del st.session_state.user_email
     st.rerun()
-st.text_area("KAMU menerima dengan cuma-cuma, berikan dengan cuma-cuma.")
 
 st.title("🙏 Diary Renungan Digital")
 st.markdown("---")
