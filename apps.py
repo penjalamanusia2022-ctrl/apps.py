@@ -25,7 +25,7 @@ def load_ayat():
 
 # --- 3. LOGIN SESSION ---
 if 'user_email' not in st.session_state:
-    st.title("🔐 Akses Diary Pribadi")
+    st.title("🔐 Akses Diary Kristiani")
     st.markdown("Masukkan email Anda untuk memisahkan catatan pribadi dengan pengguna lain.")
     
     email_input = st.text_input("Masukkan Email Anda:", placeholder="contoh: budi@email.com")
