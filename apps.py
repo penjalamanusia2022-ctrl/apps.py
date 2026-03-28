@@ -93,10 +93,9 @@ tab1, tab2, tab3 = st.tabs(["✨ Acak Ayat", "📝 Tulis Log", "📜 Riwayat Say
 # --- TAB 1: ACAK AYAT ---
 with tab1:
     st.subheader("Inspirasi Hari Ini")
-    st.button("🔄 Dapatkan Ayat Baru", on_click=handle_acak)
-    
     q_now = st.session_state["in_at"] if st.session_state["in_at"] else "Klik tombol di atas untuk memulai."
     st.info(f"### {q_now}")
+    st.button("🔄 Dapatkan Ayat Baru", on_click=handle_acak)
 
 # --- TAB 2: TULIS ---
 with tab2:
