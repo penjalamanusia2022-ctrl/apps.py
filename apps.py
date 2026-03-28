@@ -81,6 +81,8 @@ def handle_acak():
 st.sidebar.title("👤 Profil User")
 st.sidebar.info(f"Login sebagai:\n**{current_user}**")
 st.sidebar.text("Kamu menerima dengan cuma-cuma, berikan dengan cuma-cuma.")
+st.sidebar.text("Matius 9:13 - satu-satunya ayat tentang yang di kehendaki oleh Yesus")
+st.sidebar.text("Jadi pergilah dan pelajarilah arti firman ini: Yang Kukehendaki ialah belas kasihan dan bukan persembahan, karena Aku datang bukan untuk memanggil orang benar, melainkan orang berdosa.")
 if st.sidebar.button("Keluar (Logout)"):
     del st.session_state.user_email
     st.rerun()
